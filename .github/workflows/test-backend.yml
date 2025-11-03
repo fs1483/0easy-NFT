@@ -1,0 +1,117 @@
+name: 后端服务测试
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/services/**'
+      - '.github/workflows/test-backend.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/services/**'
+
+jobs:
+  test:
+    name: Go 单元测试
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_DB: oeasy_nft_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: packages/services/go.sum
+
+      - name: 下载依赖
+        run: go mod download
+        working-directory: packages/services
+
+      - name: 运行测试
+        env:
+          POSTGRES_DSN: postgresql://postgres:postgres@localhost:5432/oeasy_nft_test?sslmode=disable
+          REDIS_ADDR: localhost:6379
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        working-directory: packages/services
+
+      - name: 上传覆盖率报告
+        uses: codecov/codecov-action@v3
+        with:
+          files: packages/services/coverage.out
+          flags: backend
+          name: backend-coverage
+
+  lint:
+    name: Go Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: packages/services
+
+  build:
+    name: 构建检查
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: 构建所有服务
+        run: |
+          go build -o bin/order-service ./cmd/order-service/main.go
+          go build -o bin/matching-engine ./cmd/matching-engine/main.go
+          go build -o bin/execution-service ./cmd/execution-service/main.go
+          go build -o bin/indexer ./cmd/indexer/main.go
+        working-directory: packages/services
+
+      - name: 验证二进制文件
+        run: |
+          ls -lh bin/
+          file bin/*
+        working-directory: packages/services
+

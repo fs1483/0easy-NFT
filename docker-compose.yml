@@ -2,19 +2,19 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: oeasy-postgres
+    container_name: oeasy-nft-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: oeasy
-      POSTGRES_PASSWORD: oeasy_password
-      POSTGRES_DB: oeasy_db
+      POSTGRES_USER: postgres              # PostgreSQL 默认用户
+      POSTGRES_PASSWORD: postgres          # 开发环境密码（生产环境要改！）
+      POSTGRES_DB: postgres                # 默认数据库（init.sql 会创建 oeasy_nft）
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
   redis:
     image: redis:7-alpine
-    container_name: oeasy-redis
+    container_name: oeasy-nft-redis
     restart: unless-stopped
     ports:
       - "6379:6379"

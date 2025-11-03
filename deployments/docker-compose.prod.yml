@@ -1,0 +1,239 @@
+# ============================================
+# Docker Compose - 生产环境配置
+# ============================================
+# 用于生产环境部署所有微服务
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # 数据库服务
+  # ==========================================
+  
+  postgres:
+    image: postgres:14-alpine
+    container_name: oeasy-nft-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: oeasy_nft
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - oeasy-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: oeasy-nft-redis-prod
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - oeasy-network
+
+  # ==========================================
+  # 后端微服务
+  # ==========================================
+
+  order-service:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.order-service
+    container_name: oeasy-order-service-prod
+    restart: always
+    environment:
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/oeasy_nft?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RPC_URL: ${RPC_URL:?请设置 RPC_URL}
+      CHAIN_ID: ${CHAIN_ID:?请设置 CHAIN_ID}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS:?请设置 MARKETPLACE_ADDRESS}
+      ORDER_SERVICE_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  matching-engine:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.matching-engine
+    container_name: oeasy-matching-engine-prod
+    restart: always
+    environment:
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/oeasy_nft?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RPC_URL: ${RPC_URL}
+      CHAIN_ID: ${CHAIN_ID}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      EXECUTION_SERVICE_PORT: 8083
+    depends_on:
+      - postgres
+      - redis
+      - order-service
+      - execution-service
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  execution-service:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.execution-service
+    container_name: oeasy-execution-service-prod
+    restart: always
+    environment:
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/oeasy_nft?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RPC_URL: ${RPC_URL}
+      CHAIN_ID: ${CHAIN_ID}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+      EXECUTOR_PRIVATE_KEY: ${EXECUTOR_PRIVATE_KEY:?请设置 EXECUTOR_PRIVATE_KEY}
+      EXECUTION_SERVICE_PORT: 8083
+    ports:
+      - "8083:8083"
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8083/internal/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  indexer:
+    build:
+      context: ../../
+      dockerfile: deployments/docker/Dockerfile.indexer
+    container_name: oeasy-indexer-prod
+    restart: always
+    environment:
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/oeasy_nft?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      RPC_URL: ${RPC_URL}
+      CHAIN_ID: ${CHAIN_ID}
+      MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # 前端服务
+  # ==========================================
+
+  frontend:
+    build:
+      context: ../../packages/frontend
+      dockerfile: Dockerfile
+    container_name: oeasy-frontend-prod
+    restart: always
+    environment:
+      VITE_API_BASE_URL: http://order-service:8081
+      VITE_CHAIN_ID: ${CHAIN_ID}
+      VITE_MARKETPLACE_ADDRESS: ${MARKETPLACE_ADDRESS}
+    ports:
+      - "80:80"
+    depends_on:
+      - order-service
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # Nginx 反向代理（可选）
+  # ==========================================
+
+  nginx:
+    image: nginx:alpine
+    container_name: oeasy-nginx-prod
+    restart: always
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "443:443"
+    depends_on:
+      - frontend
+      - order-service
+    networks:
+      - oeasy-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ==========================================
+# 数据卷
+# ==========================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ==========================================
+# 网络
+# ==========================================
+
+networks:
+  oeasy-network:
+    driver: bridge
+

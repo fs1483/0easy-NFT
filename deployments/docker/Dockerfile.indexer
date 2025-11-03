@@ -1,0 +1,45 @@
+# ============================================
+# Dockerfile - 索引服务
+# ============================================
+
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /build
+
+RUN apk add --no-cache git ca-certificates tzdata
+
+COPY packages/services/go.mod packages/services/go.sum ./
+COPY packages/services/go.work packages/services/go.work.sum ./
+
+RUN go mod download
+
+COPY packages/services/ ./
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" \
+    -o /app/indexer \
+    ./cmd/indexer/main.go
+
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates tzdata
+
+ENV TZ=Asia/Shanghai
+
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+WORKDIR /app
+
+COPY --from=builder /app/indexer /app/indexer
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8084
+
+# 索引服务是后台服务，不需要 HTTP 健康检查
+
+ENTRYPOINT ["/app/indexer"]
+

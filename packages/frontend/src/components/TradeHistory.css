@@ -1,0 +1,154 @@
+/* 交易历史样式 */
+
+.trade-history-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.trade-history-header {
+  margin-bottom: 30px;
+}
+
+.trade-history-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.loading, .error, .empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.error {
+  color: #ef4444;
+}
+
+.empty-state .hint {
+  color: #999;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.trades-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trade-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.trade-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #10b981;
+}
+
+.trade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.trade-type {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.trade-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.trade-body {
+  margin-bottom: 16px;
+}
+
+.trade-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.info-row .label {
+  color: #666;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.info-row .value {
+  color: #1a1a1a;
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+}
+
+.info-row .value.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.info-row .value.price {
+  color: #10b981;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.trade-footer {
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .trade-card {
+    padding: 16px;
+  }
+
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .info-row .value {
+    text-align: left;
+  }
+}
+

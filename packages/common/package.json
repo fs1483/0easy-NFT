@@ -1,0 +1,11 @@
+{
+  "name": "@oeasy-nft/common",
+  "version": "1.0.0",
+  "description": "Shared contract ABIs and types",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src"
+  ]
+}
+

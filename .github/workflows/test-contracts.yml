@@ -1,0 +1,82 @@
+name: 智能合约测试
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/contracts/**'
+      - '.github/workflows/test-contracts.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/contracts/**'
+
+jobs:
+  test:
+    name: Foundry 测试
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 安装 Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: 显示 Foundry 版本
+        run: forge --version
+        working-directory: packages/contracts
+
+      - name: 安装依赖
+        run: forge install
+        working-directory: packages/contracts
+
+      - name: 运行测试
+        run: forge test -vvv
+        working-directory: packages/contracts
+
+      - name: 生成测试覆盖率
+        run: forge coverage --report lcov
+        working-directory: packages/contracts
+
+      - name: 上传覆盖率报告
+        uses: codecov/codecov-action@v3
+        with:
+          files: packages/contracts/lcov.info
+          flags: contracts
+          name: contract-coverage
+
+  lint:
+    name: Solidity Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: 检查代码格式
+        run: forge fmt --check
+        working-directory: packages/contracts
+
+  security:
+    name: 安全扫描
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 运行 Slither 静态分析
+        uses: crytic/slither-action@v0.3.0
+        with:
+          target: packages/contracts/src
+          fail-on: medium
+          slither-args: --filter-paths "lib|test"
+
